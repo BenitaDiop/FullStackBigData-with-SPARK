@@ -1,3 +1,3 @@
 # Analyzing 10GB of Yelp Data on AWS EMR
-### Leveraging Pyspark, Python, Spark, SQL, SparkR and R 
-Data willl be stored on **[AWS S3 Bucket](https://my-little-pony.s3.amazonaws.com/yelp/)** and Pulled to AWS EMR Cluster for Analsyis  
+### Leveraging Pyspark, Python, Spark, SQL, SparkR, R and Bash
+From the terminal all the Yelp Data is pulled **(Kaggle API)[https://www.kaggle.com/yelp-dataset/yelp-dataset]** and pushed to my **[AWS S3 Bucket](https://my-little-pony.s3.amazonaws.com/yelp/)** and then pulled into my AWS EMR Cluster for analysis.  
