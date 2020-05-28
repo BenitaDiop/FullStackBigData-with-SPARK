@@ -209,6 +209,12 @@ After identifying the best ParamMap, CrossValidator finally re-fits the Estimato
 
 
 ```python
+
+#############################################################################################
+######################Model Selection via cross-validation####################################
+##############################################################################################
+
+
 from pyspark.ml import Pipeline
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
@@ -271,3 +277,50 @@ for row in selected.collect():
     print(row)
 
 ```
+### Train-Validation Split
+In addition to CrossValidator Spark also offers TrainValidationSplit for hyper-parameter tuning. TrainValidationSplit only evaluates each combination of parameters once, as opposed to k times in the case of CrossValidator. It is therefore less expensive, but will not produce as reliable results when the training dataset is not sufficiently large.
+
+
+
+
+```python
+from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.ml.regression import LinearRegression
+from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
+
+# Prepare training and test data.
+data = spark.read.format("libsvm")\
+    .load("data/mllib/sample_linear_regression_data.txt")
+train, test = data.randomSplit([0.9, 0.1], seed=12345)
+
+lr = LinearRegression(maxIter=10)
+
+# We use a ParamGridBuilder to construct a grid of parameters to search over.
+# TrainValidationSplit will try all combinations of values and determine best model using
+# the evaluator.
+paramGrid = ParamGridBuilder()\
+    .addGrid(lr.regParam, [0.1, 0.01]) \
+    .addGrid(lr.fitIntercept, [False, True])\
+    .addGrid(lr.elasticNetParam, [0.0, 0.5, 1.0])\
+    .build()
+
+# In this case the estimator is simply the linear regression.
+# A TrainValidationSplit requires an Estimator, a set of Estimator ParamMaps, and an Evaluator.
+tvs = TrainValidationSplit(estimator=lr,
+                           estimatorParamMaps=paramGrid,
+                           evaluator=RegressionEvaluator(),
+                           # 80% of the data will be used for training, 20% for validation.
+                           trainRatio=0.8)
+
+# Run TrainValidationSplit, and choose the best set of parameters.
+model = tvs.fit(train)
+
+# Make predictions on test data. model is the model with combination of parameters
+# that performed best.
+model.transform(test)\
+    .select("features", "label", "prediction")\
+    .show()
+
+```
+
+
