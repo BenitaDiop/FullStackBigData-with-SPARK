@@ -1,4 +1,4 @@
-!SPARK DOCUMENTATION[https://spark.apache.org/docs/2.1.0/ml-features.html#vectorassembler]
+!(SPARK DOCUMENTATION)[https://spark.apache.org/docs/2.1.0/ml-features.html#vectorassembler]
 
 
 Normalizer is a Transformer which transforms a dataset of Vector rows, normalizing each Vector to have unit norm. It takes parameter p, which specifies the p-norm used for normalization. (p=2 by default.) This normalization can help standardize your input data and improve the behavior of learning algorithms.
