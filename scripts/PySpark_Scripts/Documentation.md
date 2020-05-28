@@ -1,4 +1,37 @@
-![SPARK DOCUMENTATION](https://spark.apache.org/docs/2.1.0/ml-features.html#vectorassembler)
+!SPARK DOCUMENTATION[https://spark.apache.org/docs/2.1.0/ml-features.html#vectorassembler]
+
+
+Normalizer is a Transformer which transforms a dataset of Vector rows, normalizing each Vector to have unit norm. It takes parameter p, which specifies the p-norm used for normalization. (p=2 by default.) This normalization can help standardize your input data and improve the behavior of learning algorithms.
+
+The following example demonstrates how to load a dataset in libsvm format and then normalize each row to have unit L1 norm and unit L∞ norm.
+
+
+```python
+
+from pyspark.ml.feature import Normalizer
+from pyspark.ml.linalg import Vectors
+
+dataFrame = spark.createDataFrame([
+    (0, Vectors.dense([1.0, 0.5, -1.0]),),
+    (1, Vectors.dense([2.0, 1.0, 1.0]),),
+    (2, Vectors.dense([4.0, 10.0, 2.0]),)
+], ["id", "features"])
+
+# Normalize each Vector using $L^1$ norm.
+normalizer = Normalizer(inputCol="features", outputCol="normFeatures", p=1.0)
+l1NormData = normalizer.transform(dataFrame)
+print("Normalized using L^1 norm")
+l1NormData.show()
+
+# Normalize each Vector using $L^\infty$ norm.
+lInfNormData = normalizer.transform(dataFrame, {normalizer.p: float("inf")})
+print("Normalized using L^inf norm")
+lInfNormData.show()
+
+```
+
+
+
 
 **One-hot encoding** maps a column of label indices to a column of binary vectors, with at most a single one-value. This encoding allows algorithms which expect continuous features, such as Logistic Regression, to use categorical features.
 
@@ -146,5 +179,95 @@ for row in result.collect():
     print("Text: [%s] => \nVector: %s\n" % (", ".join(text), str(vector)))
 
 ```
+### Model selection (a.k.a. hyperparameter tuning)
+An important task in ML is model selection, or using data to find the best model or parameters for a given task. This is also called tuning. Tuning may be done for individual Estimators such as LogisticRegression, or for entire Pipelines which include multiple algorithms, featurization, and other steps. Users can tune an entire Pipeline at once, rather than tuning each element in the Pipeline separately.
+
+MLlib supports model selection using tools such as CrossValidator and TrainValidationSplit. These tools require the following items:
+
+Estimator: algorithm or Pipeline to tune
+Set of ParamMaps: parameters to choose from, sometimes called a “parameter grid” to search over
+Evaluator: metric to measure how well a fitted Model does on held-out test data
+At a high level, these model selection tools work as follows:
+
+They split the input data into separate training and test datasets.
+For each (training, test) pair, they iterate through the set of ParamMaps:
+For each ParamMap, they fit the Estimator using those parameters, get the fitted Model, and evaluate the Model’s performance using the Evaluator.
+They select the Model produced by the best-performing set of parameters.
+The Evaluator can be a RegressionEvaluator for regression problems, a BinaryClassificationEvaluator for binary data, or a MulticlassClassificationEvaluator for multiclass problems. The default metric used to choose the best ParamMap can be overridden by the setMetricName method in each of these evaluators.
+
+To help construct the parameter grid, users can use the ParamGridBuilder utility.
 
 
+
+
+### Cross-Validation
+CrossValidator begins by splitting the dataset into a set of folds which are used as separate training and test datasets. E.g., with k=3 folds, CrossValidator will generate 3 (training, test) dataset pairs, each of which uses 2/3 of the data for training and 1/3 for testing. To evaluate a particular ParamMap, CrossValidator computes the average evaluation metric for the 3 Models produced by fitting the Estimator on the 3 different (training, test) dataset pairs.
+
+After identifying the best ParamMap, CrossValidator finally re-fits the Estimator using the best ParamMap and the entire dataset.
+
+
+
+
+```python
+from pyspark.ml import Pipeline
+from pyspark.ml.classification import LogisticRegression
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
+from pyspark.ml.feature import HashingTF, Tokenizer
+from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
+
+# Prepare training documents, which are labeled.
+training = spark.createDataFrame([
+    (0, "a b c d e spark", 1.0),
+    (1, "b d", 0.0),
+    (2, "spark f g h", 1.0),
+    (3, "hadoop mapreduce", 0.0),
+    (4, "b spark who", 1.0),
+    (5, "g d a y", 0.0),
+    (6, "spark fly", 1.0),
+    (7, "was mapreduce", 0.0),
+    (8, "e spark program", 1.0),
+    (9, "a e c l", 0.0),
+    (10, "spark compile", 1.0),
+    (11, "hadoop software", 0.0)
+], ["id", "text", "label"])
+
+# Configure an ML pipeline, which consists of tree stages: tokenizer, hashingTF, and lr.
+tokenizer = Tokenizer(inputCol="text", outputCol="words")
+hashingTF = HashingTF(inputCol=tokenizer.getOutputCol(), outputCol="features")
+lr = LogisticRegression(maxIter=10)
+pipeline = Pipeline(stages=[tokenizer, hashingTF, lr])
+
+# We now treat the Pipeline as an Estimator, wrapping it in a CrossValidator instance.
+# This will allow us to jointly choose parameters for all Pipeline stages.
+# A CrossValidator requires an Estimator, a set of Estimator ParamMaps, and an Evaluator.
+# We use a ParamGridBuilder to construct a grid of parameters to search over.
+# With 3 values for hashingTF.numFeatures and 2 values for lr.regParam,
+# this grid will have 3 x 2 = 6 parameter settings for CrossValidator to choose from.
+paramGrid = ParamGridBuilder() \
+    .addGrid(hashingTF.numFeatures, [10, 100, 1000]) \
+    .addGrid(lr.regParam, [0.1, 0.01]) \
+    .build()
+
+crossval = CrossValidator(estimator=pipeline,
+                          estimatorParamMaps=paramGrid,
+                          evaluator=BinaryClassificationEvaluator(),
+                          numFolds=2)  # use 3+ folds in practice
+
+# Run cross-validation, and choose the best set of parameters.
+cvModel = crossval.fit(training)
+
+# Prepare test documents, which are unlabeled.
+test = spark.createDataFrame([
+    (4, "spark i j k"),
+    (5, "l m n"),
+    (6, "mapreduce spark"),
+    (7, "apache hadoop")
+], ["id", "text"])
+
+# Make predictions on test documents. cvModel uses the best model found (lrModel).
+prediction = cvModel.transform(test)
+selected = prediction.select("id", "text", "probability", "prediction")
+for row in selected.collect():
+    print(row)
+
+```
