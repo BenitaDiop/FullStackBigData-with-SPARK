@@ -16,3 +16,14 @@ text_df = text_df.withColumn("Label", text_df.Sentiment.cast('float')).drop('Sen
 text_df.orderBy(rand()).show(10,False)
 text_df.groupBy('label').count().show()
 
+
+
+
+# Add length to the dataframe
+from pyspark.sql.functions import length
+text_df=text_df.withColumn('length',length(text_df['Review']))
+
+text_df.orderBy(rand()).show(10,False)
+text_df.groupBy('Label').agg({'Length':'mean'}).show()
+
+
