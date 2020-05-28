@@ -45,7 +45,7 @@ usr = usr1.groupBy("name", "ID").count().withColumnRenamed('count', 'YRSelite').
 
 usr = usr.withColumn('eliteSTAT', 
               f.when(usr.YRSelite > 1, 1).otherwise(0))
-)
+
 
 
 
