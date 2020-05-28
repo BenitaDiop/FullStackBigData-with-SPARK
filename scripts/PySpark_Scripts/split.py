@@ -16,6 +16,7 @@ window = Window.rowsBetween(Window.unboundedPreceding, Window.unboundedFollowing
 
 usr = spark.read.json("s3://my-little-pony/yelp/yelp_academic_dataset_user.json")
 view = spark.read.load('s3://my-little-pony/yelp/reviews.json', format='json')
+business = spark.read.json("s3://my-little-pony/yelp/yelp_academic_dataset_business.json")
 
 usr.createOrReplaceTempView("usr")
 query = """
