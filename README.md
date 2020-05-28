@@ -4,7 +4,7 @@
 
 
 ************************
-
+![](https://raw.githubusercontent.com/BenitaDiop/FullStackBigData-with-SPARK/master/assets/ER.jpg)
 
 
 ## AWS Cluster Configuration
